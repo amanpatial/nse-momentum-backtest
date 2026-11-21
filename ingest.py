@@ -8,8 +8,10 @@ Schema of table `ohlc`:
 
 from __future__ import annotations
 import datetime as dt
+import hashlib
 import pathlib
 import time
+import urllib.request
 
 import duckdb
 import numpy as np
@@ -172,6 +174,58 @@ def checks(db_path):
 
 
 # ---------- Loader for single-CSV datasets (e.g. IITKGP/Nifty500_companies_5_years_data) ----------
+# Option A source: public, MIT-licensed. The SHA-256 pins the exact file behind every README result.
+PRICES_URL = ("https://huggingface.co/datasets/IITKGP/Nifty500_companies_5_years_data"
+              "/resolve/main/nifty500_5yr_data.csv")
+PRICES_SHA256 = "74ad16d3135685880ccde748bffe58da0d13b255f190443a9f7a3b0200b648eb"
+
+
+def sha256_of(path) -> str:
+    """SHA-256 hex digest of a file, read in 1 MB chunks."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def download_prices_csv(dest=paths.PRICES_CSV, url: str = PRICES_URL, sha256: str = PRICES_SHA256,
+                        force: bool = False) -> pathlib.Path:
+    """Download the Option A price CSV to dest and verify its SHA-256; skip if a verified copy exists.
+    Writes to dest + '.part' first and renames only after the checksum matches, so an interrupted or
+    changed download never leaves a bad file in place. Raises RuntimeError on a checksum mismatch."""
+    dest = pathlib.Path(dest)
+    if dest.exists() and not force:
+        if sha256_of(dest) == sha256:
+            print(f"{dest} already present (checksum OK)")
+            return dest
+        raise RuntimeError(f"{dest} exists but its checksum does not match the pinned dataset. "
+                           "Delete it or rerun with --force to download a fresh copy.")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    part = dest.with_name(dest.name + ".part")
+    h, done, last_pct = hashlib.sha256(), 0, -10
+    print(f"downloading {url}")
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "nse-momentum-backtest"})
+        with urllib.request.urlopen(req, timeout=60) as r, open(part, "wb") as f:
+            total = int(r.headers.get("Content-Length") or 0)
+            for chunk in iter(lambda: r.read(1 << 20), b""):
+                f.write(chunk)
+                h.update(chunk)
+                done += len(chunk)
+                pct = int(done * 100 / total) if total else -1
+                if pct >= last_pct + 10:
+                    print(f"  {done / 1e6:.0f} / {total / 1e6:.0f} MB ({pct}%)", flush=True)
+                    last_pct = pct
+        if h.hexdigest() != sha256:
+            raise RuntimeError(f"checksum mismatch for {url}: got {h.hexdigest()}, expected {sha256}. "
+                               "The source file may have changed; results would not match the README.")
+        part.replace(dest)
+    finally:
+        part.unlink(missing_ok=True)
+    print(f"saved {dest} ({done / 1e6:.1f} MB, checksum OK)")
+    return dest
+
 # Columns: Date, Ticker, Open, High, Low, Close, Volume[, Notes]. No turnover, no adjustment info.
 SPLIT_RATIOS = [1/2, 1/3, 1/4, 1/5, 1/10, 2/3, 3/4]  # price ratio on ex-date: splits, 1:1/2:1/1:2 bonuses
 

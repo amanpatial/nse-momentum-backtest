@@ -23,24 +23,29 @@ All figures carry survivorship bias and cover a short, mostly bullish period; se
 **Requirements:** Python 3.9 or newer, about 200 MB disk, macOS / Linux / Windows.
 
 ```bash
-git clone <repo-url> nse-momentum-backtest && cd nse-momentum-backtest
+git clone https://github.com/amanpatial/nse-momentum-backtest.git && cd nse-momentum-backtest
 python3 -m venv .venv
 source .venv/bin/activate              # Windows: .venv\Scripts\activate
 pip install --upgrade pip
 pip install -r requirements.txt
-python -m pytest tests/        # no data needed; all 9 tests should pass
+python -m pytest tests/        # no data or network needed; all 13 tests should pass
 ```
 
-**Get the data** (not in the repo, 54 MB): download `nifty500_5yr_data.csv` from the
-[IITKGP Nifty500 dataset](https://huggingface.co/datasets/IITKGP/Nifty500_companies_5_years_data)
-("Files and versions" tab) and put it in the `data/` folder (`data/nifty500_5yr_data.csv`).
-
-**Build the database and reproduce every result in this README** (about a minute or less):
+**Download the data, build the database and reproduce every result in this README** (about a minute
+plus the download):
 ```bash
 ./run_all.sh                      # Windows: run the commands inside run_all.sh one by one
 SKIP_BUILD=1 ./run_all.sh         # reuse an existing data/smallcap.duckdb
 ```
 Expected check: `results/summary.json` shows `strategy_net.CAGR` = 0.2893.
+
+**The data is downloaded automatically.** The price file `data/nifty500_5yr_data.csv` (55 MB, not in
+the repo) comes from the MIT-licensed
+[IITKGP Nifty500 dataset](https://huggingface.co/datasets/IITKGP/Nifty500_companies_5_years_data).
+On the first run, `run_all.sh` downloads it and checks its SHA-256 against the exact file used for
+these results, so you get identical numbers (a changed source file fails loudly instead). Later runs
+reuse it. To fetch it on its own: `python pipeline.py download` (`--force` to re-download). Offline or
+behind a proxy? Download it by hand from the link above ("Files and versions" tab) into `data/`.
 
 **Open the dashboard (frontend)** to explore the results visually (details in [Dashboard](#dashboard)):
 ```bash
@@ -110,8 +115,8 @@ results/                              outputs of run_all.sh (not in git)
 | File | What it does |
 |---|---|
 | `paths.py` | Default file locations (`data/...`, `results/`), relative to the repo root |
-| `pipeline.py` | CLI: `build-csv` / `build` the database, `check` data, run the main `backtest` |
-| `ingest.py` | Data loading, NSE bhavcopy fetch, corporate-action adjustment, data checks |
+| `pipeline.py` | CLI: `download` the price data, `build-csv` / `build` the database, `check` data, run the main `backtest` |
+| `ingest.py` | Price-data download (checksum-verified), data loading, NSE bhavcopy fetch, corporate-action adjustment, data checks |
 | `universe.py` | Universe selection by market-cap rank (Option B) |
 | `nifty500_downloader.py` | Optional: download ~10 years of Nifty 500 prices from Yahoo Finance into the CSV format `build-csv` reads (needs `pip install yfinance`; not used by `run_all.sh`) |
 | `backtest.py` | Strategy rules, volatility filter, benchmarks, stats; shared helpers (`signals`, `month_ends`, `stats_row`, `add_trade_pnl`) used by every other engine |
@@ -126,6 +131,7 @@ results/                              outputs of run_all.sh (not in git)
 | `tests/test_rules.py` | Selection rule (buffer band) and volatility filter |
 | `tests/test_csv_loader.py` | Single-CSV loader: split detection and adjustment, ticker cleanup |
 | `tests/test_synthetic_pipeline.py` | End-to-end on synthetic NSE files: parse, rename, adjust, build, backtest |
+| `tests/test_download.py` | Checksum-verified data download (offline, via local file URLs) |
 
 ## 3. Strategy rules (`backtest.py`)
 

@@ -1,8 +1,9 @@
-"""CLI: python pipeline.py <universe|fetch|build|build-csv|check|backtest> ...
+"""CLI: python pipeline.py <download|universe|fetch|build|build-csv|check|backtest> ...
 
 Default paths come from paths.py (inputs and the database in data/, outputs in results/).
 
 Option A (single CSV, used for every result in the README), see run_all.sh:
+  python pipeline.py download          # fetch + verify data/nifty500_5yr_data.csv (skips if present)
   python pipeline.py build-csv --csv data/nifty500_5yr_data.csv --corp-actions data/corp_actions.csv
   python pipeline.py check
   python pipeline.py backtest --out results/
@@ -28,6 +29,10 @@ def main():
     """CLI entry point: dispatch universe / fetch / build / check / backtest subcommands."""
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
+
+    p = sub.add_parser("download", help="download and verify the Option A price CSV")
+    p.add_argument("--out", default=str(paths.PRICES_CSV))
+    p.add_argument("--force", action="store_true", help="re-download even if a verified copy exists")
 
     p = sub.add_parser("universe")
     p.add_argument("--constituents", required=True)
@@ -68,7 +73,9 @@ def main():
     p.add_argument("--end", default=None)
 
     a = ap.parse_args()
-    if a.cmd == "universe":
+    if a.cmd == "download":
+        ingest.download_prices_csv(a.out, force=a.force)
+    elif a.cmd == "universe":
         sel = universe.select(a.constituents, a.start_rank, a.end_rank, a.out)
         print(f"{len(sel)} stocks -> {a.out}")
     elif a.cmd == "fetch":

@@ -15,7 +15,10 @@ $PY tests/test_rules.py
 $PY tests/test_csv_loader.py
 
 if [ -z "${SKIP_BUILD:-}" ]; then
-  [ -f "$CSV" ] || { echo "Missing $CSV (download it, see README section 1)"; exit 1; }
+  if [ ! -f "$CSV" ]; then
+    echo "== download price data (Hugging Face, ~55 MB, checksum-verified)"
+    $PY pipeline.py download --out "$CSV" || { echo "Download failed: get $CSV by hand (see data/README.md)"; exit 1; }
+  fi
   echo "== build database (data/corp_actions.csv = reviewed split/bonus fixes)"
   $PY pipeline.py build-csv --csv "$CSV" --db "$DB" --corp-actions data/corp_actions.csv
   $PY pipeline.py check --db "$DB"
