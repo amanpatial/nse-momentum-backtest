@@ -381,3 +381,7 @@ At 40 bps it gives 37.1% (vs 28.9% base).
 - Benchmarks are equal-weight / buy-and-hold of the same universe, not Nifty Smallcap 250 TRI.
 - Traded value in Option A is close x volume (proxy).
 - Option B fetch URLs were not tested against live NSE; verify the legacy to UDiFF cutover (~8 Jul 2024).
+
+## License
+
+[MIT](LICENSE) © 2026 Aman Patial. Research code for educational use, not investment advice.
