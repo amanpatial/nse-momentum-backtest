@@ -15,6 +15,8 @@ with one command.
 | Buy and hold, same universe | 28.3% | 1.36 | -24.4% | 3.14 cr |
 
 All figures carry survivorship bias and cover a short, mostly bullish period; see [Limitations](#limitations).
+A 10-year test (2017-2026, incl. the 2020 crash) is in [section 6.6](#66-ten-year-test-yahoo-finance-data-2017-2026):
+momentum still beat buy and hold, with deeper drawdowns (about -49%) and a larger survivorship bias.
 
 ![Dashboard overview: headline numbers and growth of Rs 1 crore vs buy and hold](docs/images/overview.png)
 *The interactive dashboard (`streamlit run dashboard.py`); more screenshots in [Dashboard](#dashboard).*
@@ -172,7 +174,7 @@ docs/images/                          dashboard screenshots used in this README
 
 ## 4. Data
 
-### Option A: IITKGP Nifty 500 CSV (Jun 2021 - Jun 2026), used for all results here
+### Option A: IITKGP Nifty 500 CSV (Jun 2021 - Jun 2026), used for all results except section 6.6
 ```bash
 python pipeline.py build-csv --corp-actions data/corp_actions.csv   # reads data/nifty500_5yr_data.csv
 python pipeline.py check                                           # lists remaining >30% daily moves
@@ -204,6 +206,18 @@ python pipeline.py build --universe data/universe.csv \
 python pipeline.py check
 ```
 Input files: `nifty500_2016.csv` (`symbol,mcap_cr`), `data/corp_actions.csv`, `symbol_map.csv` (`old,new`).
+
+### Option C: Yahoo Finance, 10 years (optional, used only in section 6.6)
+```bash
+pip install yfinance
+python nifty500_downloader.py --start 2016-11-22 --end 2026-11-22     # ~40 s -> data/nifty500_2016_2026.csv
+python pipeline.py build-csv --csv data/nifty500_2016_2026.csv --db data/nifty500_10y.duckdb \
+    --detected-out data/detected_actions_10y.csv --corp-actions data/corp_actions_10y.csv \
+    --drop-rows data/bad_rows_10y.csv
+```
+Yahoo prices include dividends but still had unadjusted splits and glitches; `data/corp_actions_10y.csv`
+and `data/bad_rows_10y.csv` hold the reviewed fixes (see section 6.6). Yahoo revises prices over time, so a
+fresh download can differ slightly.
 
 ## 5. Command reference
 
@@ -403,14 +417,64 @@ At 40 bps it gives 37.1% (vs 28.9% base).
 - The share-based engine agrees (`stoploss_backtest.py --stops 0 --max-vol-pctile 0.9`: 41.8%).
 - Still off by default; recommended setting: `--max-vol-pctile 0.9 --vol-window 63 --vol-freq daily`.
 
-### 6.6 Ideas not yet tested
+### 6.6 Ten-year test (Yahoo Finance data, 2017-2026)
+
+Same rules on 10 years of data (Option C), to see a full cycle including the 2018-19 small-cap slump and
+the 2020 crash. Period 2017-03-01 to 2026-11-20 (9.5 years; the first review needs 3 months of history).
+
+| | CAGR | Sharpe | Max DD | Rs 1 cr becomes |
+|---|---|---|---|---|
+| Base strategy @ 40 bps/side | 35.2% | 1.32 | -50.5% | 17.7 cr |
+| Base strategy @ 12 bps/side | 39.5% | 1.45 | -48.7% | 23.9 cr |
+| + volatility filter, drop top 10% (12 bps) | 39.5% | 1.61 | -41.8% | 23.9 cr |
+| Buy and hold, same universe | 23.7% | 1.22 | -46.9% | 7.6 cr |
+| Equal-weight benchmark | 24.9% | 1.31 | -46.0% | 8.3 cr |
+
+Calendar-year returns, % (2017 and 2026 partial):
+
+| | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Base @ 12 bps | 107.3 | -3.3 | 9.5 | 13.7 | 106.4 | 31.0 | 94.6 | 39.7 | -2.1 | 33.3 |
+| Vol filter @ 12 bps | 58.0 | -0.9 | 14.6 | 29.3 | 104.4 | 40.4 | 101.8 | 48.0 | -5.9 | 27.8 |
+| Buy and hold | 45.4 | -11.7 | -2.4 | 32.9 | 76.0 | 7.9 | 53.7 | 37.5 | 0.5 | 12.9 |
+
+What it shows:
+- **Momentum held up over a full cycle**, beating buy and hold by about 12-16 points a year, but with
+  real pain: the worst drawdown was about -49% (peak 17 Jan 2020, bottom 24 Mar 2020), versus -31% in
+  the 4.6-year sample, plus flat or negative years (2018, 2019, 2025).
+- **The volatility filter's value is clearer here:** the same CAGR with a smaller drawdown (-42% vs -49%)
+  and a higher Sharpe (1.61 vs 1.45).
+- **2017's +107% is genuine**, driven mainly by HEG and Graphite India in the graphite-electrode boom.
+
+**Bigger survivorship bias, measured.** The universe is today's Nifty 500. Over the overlap with the
+main dataset (2021-10-01 to 2026-06-09, 40 bps), this data gives 38.4% CAGR vs 28.9% on the main data.
+Restricted to the 470 stocks both lists share, the two agree (30.5% vs 30.6%), so prices and fixes are
+consistent. The gap comes from ~29 stocks in today's list but not the older one: stocks usually join the
+index *after* rising, which momentum then "buys". Treat the 10-year returns as optimistic; an unbiased
+test needs historical index membership.
+
+**Data cleaning** (Yahoo "adjusted" prices are not clean):
+- `data/corp_actions_10y.csv`: 6 of the reviewed fixes in `corp_actions.csv` are unadjusted in Yahoo too
+  (CGCL, GPIL, MOTILALOFS, TRENT, VEDL, TMPV); plus the ABREL (2019) and HEG (2026) demergers.
+- `data/bad_rows_10y.csv` (509 rows, each with a reason): INDIAMART Diwali-session prices at ~2x,
+  a CDSL listing-day row missing a later bonus adjustment, and 13 stale-quote runs (zero volume, frozen
+  price, e.g. J&KBANK / GVT&D / FSL for their first 67 days).
+- After cleaning, every remaining one-day move beyond +-35% is a real event (2017 PSU-bank
+  recapitalisation, 2020 crash, YESBANK rescue, ZEEL-Invesco).
+
+Reproduce: build the database (Option C), then
+`python pipeline.py backtest --db data/nifty500_10y.duckdb --out results/10y/base_12bps --cost-bps 12`
+(add `--max-vol-pctile 0.9` for the filter, `--cost-bps 40` for the default cost).
+
+### 6.7 Ideas not yet tested
 - Capital gains tax (STCG 20% on realized strategy gains each year, LTCG 12.5% on buy and hold at exit).
 - Trailing stop-loss; market filter (go to cash when the index is below its 200-day average).
 - Next-day open fills instead of ranking-day close.
 
 ## Limitations
 - Option A universe is today's Nifty 500, so stocks that dropped out are missing (survivorship bias flatters results).
-- Short sample (~4.6 years, mostly a bull market).
+- Short sample (~4.6 years, mostly a bull market). The 10-year test (section 6.6) covers a full cycle but
+  uses today's index list, so its survivorship bias is larger.
 - Fills at the ranking-day close; capital gains tax not modelled; flat cost for every stock and trade size.
 - Delisted stocks: returns after the last trading day count as 0 (optimistic).
 - Benchmarks are equal-weight / buy-and-hold of the same universe, not Nifty Smallcap 250 TRI.
