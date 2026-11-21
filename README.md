@@ -16,6 +16,9 @@ with one command.
 
 All figures carry survivorship bias and cover a short, mostly bullish period; see [Limitations](#limitations).
 
+![Dashboard overview: headline numbers and growth of Rs 1 crore vs buy and hold](docs/images/overview.png)
+*The interactive dashboard (`streamlit run dashboard.py`); more screenshots in [Dashboard](#dashboard).*
+
 ---
 
 ## 1. Setup for a new developer
@@ -100,6 +103,16 @@ Troubleshooting:
 
 The dashboard only reads `results/` and the database; it never changes them. Follows your light/dark theme.
 
+**Screenshots:**
+
+| Overview: headline numbers, growth of Rs 1 cr | Monthly returns heatmap |
+|---|---|
+| ![Overview page](docs/images/overview.png) | ![Monthly returns heatmap](docs/images/monthly-returns.png) |
+| **Trades:** filters, P&L distribution, holding period vs return | **Experiments:** volatility-filter grid |
+| ![Trades page](docs/images/trades.png) | ![Volatility-filter heatmap](docs/images/experiments-volfilter.png) |
+| **Experiments:** lookback & review-frequency variants | **Run a backtest:** custom rules vs defaults (here: vol filter 10%, 12 bps) |
+| ![Lookback variants](docs/images/experiments-variants.png) | ![Run a backtest page](docs/images/run-backtest.png) |
+
 ## 2. Project layout
 
 ```
@@ -110,6 +123,7 @@ run_all.sh                            reproduces every result
 data/                                 inputs + database (only corp_actions.csv is in git; see data/README.md)
 tests/                                pytest tests (no data needed)
 results/                              outputs of run_all.sh (not in git)
+docs/images/                          dashboard screenshots used in this README
 ```
 
 | File | What it does |
