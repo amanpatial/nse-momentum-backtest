@@ -1,5 +1,13 @@
-"""Unit tests for the buffer-band selection rule (top 20, sell only below rank 30)."""
-from backtest import select_holdings
+"""Unit tests for the buffer-band selection rule (top 20, sell only below rank 30) and the volatility filter.
+
+Run: python -m pytest tests/   or   python tests/test_rules.py
+"""
+import pathlib
+import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))   # import the repo-root modules
+
+from backtest import select_holdings  # noqa: E402
 
 N, B = 20, 30
 universe = [f"S{i:02d}" for i in range(1, 61)]            # S01 = rank 1

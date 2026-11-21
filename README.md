@@ -28,17 +28,17 @@ python3 -m venv .venv
 source .venv/bin/activate              # Windows: .venv\Scripts\activate
 pip install --upgrade pip
 pip install -r requirements.txt
-python test_rules.py && python test_csv.py && python test_synth.py   # no data needed; all should pass
+python -m pytest tests/        # no data needed; all 9 tests should pass
 ```
 
 **Get the data** (not in the repo, 54 MB): download `nifty500_5yr_data.csv` from the
 [IITKGP Nifty500 dataset](https://huggingface.co/datasets/IITKGP/Nifty500_companies_5_years_data)
-("Files and versions" tab) and put it in the repo root.
+("Files and versions" tab) and put it in the `data/` folder (`data/nifty500_5yr_data.csv`).
 
 **Build the database and reproduce every result in this README** (about a minute or less):
 ```bash
 ./run_all.sh                      # Windows: run the commands inside run_all.sh one by one
-SKIP_BUILD=1 ./run_all.sh         # reuse an existing smallcap.duckdb
+SKIP_BUILD=1 ./run_all.sh         # reuse an existing data/smallcap.duckdb
 ```
 Expected check: `results/summary.json` shows `strategy_net.CAGR` = 0.2893.
 
@@ -51,7 +51,9 @@ Your browser opens at http://localhost:8501. Press `Ctrl+C` in the terminal to s
 Notes:
 - On macOS system Python you may see a `NotOpenSSLWarning` from urllib3. It's harmless; `run_all.sh`
   hides it with `PYTHONWARNINGS=ignore`.
-- Not in git (see `.gitignore`): `.venv/`, the data CSV, `smallcap.duckdb`, and `results/` (all regenerated).
+- Not in git (see `.gitignore`): `.venv/`, everything in `data/` except `corp_actions.csv` (the price CSV and
+  `smallcap.duckdb`), and `results/`. All of it is downloaded or regenerated.
+- Default file locations are defined once in `paths.py`, so scripts work from any folder.
 - Code must stay Python 3.9 compatible: modules using `X | None` hints need `from __future__ import annotations`.
 
 ### Dashboard
@@ -60,7 +62,7 @@ A visual view of the same results, in addition to the command line (Streamlit + 
 `requirements.txt`).
 
 **Run it:**
-1. Make sure results exist: `./run_all.sh` (or `SKIP_BUILD=1 ./run_all.sh` if `smallcap.duckdb` is already built).
+1. Make sure results exist: `./run_all.sh` (or `SKIP_BUILD=1 ./run_all.sh` if `data/smallcap.duckdb` is already built).
 2. From the repo root, start the app:
    ```bash
    .venv/bin/streamlit run dashboard.py                      # macOS / Linux
@@ -78,7 +80,7 @@ Options:
 
 Troubleshooting:
 - *"Some results are missing"* on a page: run `./run_all.sh` first.
-- *"smallcap.duckdb not found"* on **Run a backtest**: build the database with `./run_all.sh`.
+- *"data/smallcap.duckdb not found"* on **Run a backtest**: build the database with `./run_all.sh`.
 - `ModuleNotFoundError: streamlit` / `plotly`: run `pip install -r requirements.txt` inside `.venv`.
 - A "install the Watchdog module" tip in the terminal is optional (only speeds up reloads after code edits).
 
@@ -89,16 +91,27 @@ Troubleshooting:
   return, best/worst stocks; download the filtered CSV.
 - **Experiments:** costs, volatility-filter heatmap, stop-loss, lookback / review-frequency variants.
 - **Run a backtest:** change lookback, portfolio size, buffer, cost, liquidity and volatility filter, and
-  rerun `backtest.run()` on `smallcap.duckdb` (a few seconds), compared with the default rules.
+  rerun `backtest.run()` on `data/smallcap.duckdb` (a few seconds), compared with the default rules.
 
 The dashboard only reads `results/` and the database; it never changes them. Follows your light/dark theme.
 
 ## 2. Project layout
 
+```
+backtest.py, ingest.py, paths.py      core modules (strategy engine, data loading, file locations)
+pipeline.py, export_trades.py, ...    command-line scripts (table below)
+dashboard.py                          Streamlit dashboard
+run_all.sh                            reproduces every result
+data/                                 inputs + database (only corp_actions.csv is in git)
+tests/                                pytest tests (no data needed)
+results/                              outputs of run_all.sh (not in git)
+```
+
 | File | What it does |
 |---|---|
+| `paths.py` | Default file locations (`data/...`, `results/`), relative to the repo root |
 | `pipeline.py` | CLI: `build-csv` / `build` the database, `check` data, run the main `backtest` |
-| `data.py` | Data loading, NSE bhavcopy fetch, corporate-action adjustment, data checks |
+| `ingest.py` | Data loading, NSE bhavcopy fetch, corporate-action adjustment, data checks |
 | `universe.py` | Universe selection by market-cap rank (Option B) |
 | `nifty500_downloader.py` | Optional: download ~10 years of Nifty 500 prices from Yahoo Finance into the CSV format `build-csv` reads (needs `pip install yfinance`; not used by `run_all.sh`) |
 | `backtest.py` | Strategy rules, volatility filter, benchmarks, stats; shared helpers (`signals`, `month_ends`, `stats_row`, `add_trade_pnl`) used by every other engine |
@@ -109,8 +122,10 @@ The dashboard only reads `results/` and the database; it never changes them. Fol
 | `sweep.py` | Parameter sweeps: cost levels, volatility-filter grid |
 | `run_all.sh` | Rebuilds the database and regenerates every result |
 | `dashboard.py` | Interactive web dashboard over `results/` (see [Dashboard](#dashboard)) |
-| `corp_actions.csv` | Reviewed split / bonus / demerger adjustments used for the Option A build |
-| `test_rules.py`, `test_csv.py`, `test_synth.py` | Self-tests (selection rule, vol filter, CSV loader, synthetic end-to-end) |
+| `data/corp_actions.csv` | Reviewed split / bonus / demerger adjustments used for the Option A build |
+| `tests/test_rules.py` | Selection rule (buffer band) and volatility filter |
+| `tests/test_csv_loader.py` | Single-CSV loader: split detection and adjustment, ticker cleanup |
+| `tests/test_synthetic_pipeline.py` | End-to-end on synthetic NSE files: parse, rename, adjust, build, backtest |
 
 ## 3. Strategy rules (`backtest.py`)
 
@@ -139,42 +154,42 @@ The dashboard only reads `results/` and the database; it never changes them. Fol
 
 ### Option A: IITKGP Nifty 500 CSV (Jun 2021 - Jun 2026), used for all results here
 ```bash
-python pipeline.py build-csv --csv nifty500_5yr_data.csv --db smallcap.duckdb --corp-actions corp_actions.csv
-python pipeline.py check --db smallcap.duckdb          # lists remaining >30% daily moves
+python pipeline.py build-csv --corp-actions data/corp_actions.csv   # reads data/nifty500_5yr_data.csv
+python pipeline.py check                                           # lists remaining >30% daily moves
 ```
-The CSV prices are **not** adjusted for splits, bonuses or demergers. How `corp_actions.csv` was made:
-1. A plain `build-csv` writes `detected_actions.csv`: 12 suspected unadjusted splits (big overnight drop
+The CSV prices are **not** adjusted for splits, bonuses or demergers. How `data/corp_actions.csv` was made:
+1. A plain `build-csv` writes `data/detected_actions.csv`: 12 suspected unadjusted splits (big overnight drop
    on high volume).
 2. Each was checked against price and volume. ABFRL, CGCL, GPIL and TRENT were real corporate actions.
    The others (ADANIENT, CYIENT, INDUSINDBK, PFC, RBLBANK, RECLTD, ZEEL, all ~25% drops) were treated as
    genuine price falls, not splits.
 3. `check` found three more that weren't flagged: MOTILALOFS, VEDL and TMPV.
-4. Those 7 went into `corp_actions.csv`.
+4. Those 7 went into `data/corp_actions.csv`.
 
-`--auto-adjust` applies every flagged row blindly (it writes `detected_actions.csv.apply.csv`). Don't use
+`--auto-adjust` applies every flagged row blindly (it writes `data/detected_actions.csv.apply.csv`). Don't use
 it for these results; it wrongly "adjusts" the genuine price falls.
 
 `corp_actions.csv` format: `symbol,ex_date,factor`. The factor multiplies prices **before** `ex_date`:
 5-for-1 split = 0.2, 1:1 bonus = 0.5.
 
-Optional: `--universe universe.csv` (column `symbol`) restricts to a subset, e.g. the lower half of the 500
+Optional: `--universe data/universe.csv` (column `symbol`) restricts to a subset, e.g. the lower half of the 500
 by traded value, to approximate small caps.
 
 ### Option B: NSE bhavcopy 2015 to date (needs access to nsearchives.nseindia.com; not tested live)
 ```bash
-python pipeline.py universe --constituents nifty500_2016.csv --out universe.csv    # ranks 251-600
-python pipeline.py fetch --start 2015-01-01 --end 2026-11-20 --out raw/
-python pipeline.py build --raw raw/ --db smallcap.duckdb --universe universe.csv \
-       --corp-actions corp_actions.csv --symbol-map symbol_map.csv
-python pipeline.py check --db smallcap.duckdb
+python pipeline.py universe --constituents nifty500_2016.csv      # ranks 251-600 -> data/universe.csv
+python pipeline.py fetch --start 2015-01-01 --end 2026-11-20      # -> data/raw/
+python pipeline.py build --universe data/universe.csv \
+       --corp-actions data/corp_actions.csv --symbol-map symbol_map.csv
+python pipeline.py check
 ```
-Input files: `nifty500_2016.csv` (`symbol,mcap_cr`), `corp_actions.csv`, `symbol_map.csv` (`old,new`).
+Input files: `nifty500_2016.csv` (`symbol,mcap_cr`), `data/corp_actions.csv`, `symbol_map.csv` (`old,new`).
 
 ## 5. Command reference
 
 **Main backtest:**
 ```bash
-python pipeline.py backtest --db smallcap.duckdb --out results/ [options]
+python pipeline.py backtest --out results/ [options]       # --db defaults to data/smallcap.duckdb
 ```
 
 | Option | Default | Meaning |
@@ -197,7 +212,7 @@ Outputs in `--out`:
 - `daily_returns.csv`: daily `net`, `gross`, `bench`, `buy_hold` returns and `turnover`.
 - `year_end_value_per_1cr.csv`: value of Rs 1 cr at each year-end for each approach.
 
-**Other scripts** (all take `--db`, `--cost-bps` (default 12), `--out`, and the three volatility options):
+**Other scripts** (all take `--db` (default `data/smallcap.duckdb`), `--cost-bps` (default 12), `--out`, and the three volatility options):
 
 | Command | Extra options | Output |
 |---|---|---|

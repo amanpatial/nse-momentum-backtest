@@ -15,6 +15,8 @@ import duckdb
 import numpy as np
 import pandas as pd
 
+import paths
+
 HDRS = {
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64)",
     "Accept": "*/*",
@@ -204,7 +206,7 @@ def detect_corp_actions(df: pd.DataFrame, tol: float = 0.04) -> pd.DataFrame:
 
 
 def build_db_from_csv(csv_path, db_path, auto_adjust=False, ca_csv=None,
-                      detected_out="detected_actions.csv", universe_csv=None):
+                      detected_out=str(paths.DETECTED_ACTIONS), universe_csv=None):
     """Build the DuckDB ohlc table from the CSV dataset, flagging and applying splits."""
     df = read_csv_dataset(csv_path)
     if universe_csv:

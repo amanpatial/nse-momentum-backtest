@@ -1,8 +1,8 @@
 """Parameter sweeps on the main backtest (backtest.run), saved as CSV.
 
 Usage:
-  python sweep.py costs     --db smallcap.duckdb --costs 12 20 40          --out results/sweeps
-  python sweep.py volfilter --db smallcap.duckdb --cost-bps 12              --out results/sweeps
+  python sweep.py costs     --costs 12 20 40     --out results/sweeps
+  python sweep.py volfilter --cost-bps 12        --out results/sweeps
   python sweep.py volfilter --pctiles 1.0 0.9 0.8 --windows 63 --freqs daily weekly
 
 costs     : strategy at each cost per side, plus buy and hold -> costs.csv
@@ -15,6 +15,7 @@ import pathlib
 import pandas as pd
 
 import backtest as bt
+import paths
 
 
 def row(out: pd.DataFrame, col: str = "net") -> dict:
@@ -66,8 +67,8 @@ def main():
     """CLI: run the costs or volfilter sweep and save the table to CSV."""
     ap = argparse.ArgumentParser()
     ap.add_argument("sweep", choices=["costs", "volfilter"])
-    ap.add_argument("--db", default="smallcap.duckdb")
-    ap.add_argument("--out", default="results/sweeps")
+    ap.add_argument("--db", default=str(paths.DB))
+    ap.add_argument("--out", default=str(paths.RESULTS_DIR / "sweeps"))
     ap.add_argument("--costs", type=float, nargs="+", default=[12, 20, 40])
     ap.add_argument("--cost-bps", type=float, default=12.0, help="cost for the volfilter sweep")
     ap.add_argument("--pctiles", type=float, nargs="+", default=[1.0, 0.95, 0.9, 0.85, 0.8, 0.7, 0.5])

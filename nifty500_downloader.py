@@ -4,7 +4,7 @@ format `pipeline.py build-csv` reads: Date,Ticker,Open,High,Low,Close,Volume.
 Standalone: needs only  python -m pip install pandas requests yfinance  (Python 3.10+).
 
 Usage (run on your machine, needs internet):
-  python nifty500_downloader.py --start 2016-01-01 --out nifty500_2016_2026.csv
+  python nifty500_downloader.py --start 2016-01-01        # writes data/nifty500_2016_2026.csv
   python nifty500_downloader.py --constituents my_symbols.csv --start 2016-01-01   # CSV with a Symbol column
 
 Prices are auto-adjusted for splits AND dividends (total-return style), so detect/adjust steps
@@ -14,6 +14,7 @@ absent (the constituent list is today's), i.e. survivorship bias remains.
 import argparse
 import datetime as dt
 import io
+import pathlib
 import sys
 import time
 
@@ -26,6 +27,7 @@ URLS = [
 ]
 UA = {"User-Agent": "Mozilla/5.0"}
 FIELDS = ["Open", "High", "Low", "Close", "Volume"]
+DEFAULT_OUT = pathlib.Path(__file__).resolve().parent / "data" / "nifty500_2016_2026.csv"
 
 
 def load_symbols(path_or_none):
@@ -76,7 +78,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--start", default="2016-01-01")
     ap.add_argument("--end", default=dt.date.today().isoformat())
-    ap.add_argument("--out", default="nifty500_2016_2026.csv")
+    ap.add_argument("--out", default=str(DEFAULT_OUT))
     ap.add_argument("--constituents")
     ap.add_argument("--batch", type=int, default=40)
     a = ap.parse_args()
@@ -106,6 +108,7 @@ def main():
         print(f"  {min(i + a.batch, len(syms))}/{len(syms)}", flush=True)
         time.sleep(1)
     out = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    pathlib.Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     out.to_csv(a.out, index=False)
     first = out.groupby("Ticker")["Date"].min() if len(out) else pd.Series(dtype=str)
     print(f"wrote {a.out}: {len(out)} rows, {out['Ticker'].nunique() if len(out) else 0} tickers")

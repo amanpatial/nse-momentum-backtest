@@ -3,12 +3,11 @@
 Usage: streamlit run dashboard.py      (after ./run_all.sh has written results/)
 
 Pages: Overview, Trades, Experiments (reads results/), and Run a backtest (reruns backtest.run on
-smallcap.duckdb with your own settings). The command-line scripts are unchanged.
+data/smallcap.duckdb with your own settings). The command-line scripts are unchanged.
 """
 from __future__ import annotations
 
 import json
-import pathlib
 
 import numpy as np
 import pandas as pd
@@ -16,10 +15,10 @@ import plotly.graph_objects as go
 import streamlit as st
 
 import backtest as bt
+import paths
 
-ROOT = pathlib.Path(__file__).resolve().parent
-RES = ROOT / "results"
-DB = ROOT / "smallcap.duckdb"
+RES = paths.RESULTS_DIR
+DB = paths.DB
 
 st.set_page_config(page_title="NSE Momentum Backtest", page_icon="📈", layout="wide")
 
@@ -444,9 +443,9 @@ def page_run():
     """Rerun the backtest with custom rules and compare it with the default rules at the same cost."""
     st.title("Run a backtest")
     if not DB.exists():
-        st.warning("smallcap.duckdb not found. Run `./run_all.sh` first.")
+        st.warning("data/smallcap.duckdb not found. Run `./run_all.sh` first.")
         return
-    st.caption("Changes the rules and reruns the full backtest on smallcap.duckdb (a few seconds). "
+    st.caption("Changes the rules and reruns the full backtest on data/smallcap.duckdb (a few seconds). "
                "Compared with the default rules at the same cost.")
     d = bt.Cfg()
     with st.form("cfg"):

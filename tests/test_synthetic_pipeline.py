@@ -3,13 +3,16 @@ Checks: legacy parsing, series filter, ticker rename mapping, split adjustment,
 universe filter, DuckDB build, data checks, backtest runs with finite output."""
 import pathlib
 import shutil
+import sys
 import tempfile
 
+import duckdb
 import numpy as np
 import pandas as pd
 
-import backtest as bt
-import data
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))   # import the repo-root modules
+import backtest as bt  # noqa: E402
+import ingest  # noqa: E402
 
 
 def gen(raw: pathlib.Path, n=150, start="2015-01-01", end="2018-12-31"):
@@ -42,7 +45,7 @@ def gen(raw: pathlib.Path, n=150, start="2015-01-01", end="2018-12-31"):
     return days
 
 
-def main():
+def test_synthetic_pipeline():
     """Build a DB from synthetic data, run checks and a backtest, and assert the results."""
     tmp = pathlib.Path(tempfile.mkdtemp())
     raw = tmp / "raw"
@@ -51,9 +54,8 @@ def main():
     pd.DataFrame({"symbol": ["SYM000"], "ex_date": ["2017-06-01"], "factor": [0.2]}).to_csv(tmp / "ca.csv", index=False)
     pd.DataFrame({"old": ["OLD001"], "new": ["SYM001"]}).to_csv(tmp / "map.csv", index=False)
     db = str(tmp / "t.duckdb")
-    print("build:", data.build_db(str(raw), db, str(tmp / "ca.csv"), str(tmp / "map.csv")))
+    print("build:", ingest.build_db(str(raw), db, str(tmp / "ca.csv"), str(tmp / "map.csv")))
 
-    import duckdb
     con = duckdb.connect(db, read_only=True)
     assert con.execute("select count(*) from ohlc where symbol in ('JUNK','OLD001')").fetchone()[0] == 0
     assert con.execute("select count(*) from ohlc where symbol='SYM001'").fetchone()[0] == len(days)
@@ -65,7 +67,7 @@ def main():
     print(f"SYM000 max daily move raw={raw_max:.2f} adjusted={adj_max:.2f}")
     assert raw_max > 0.5 and adj_max < 0.3, "split adjustment failed"
 
-    chk = data.checks(db)
+    chk = ingest.checks(db)
     print("big_moves rows (>30%):", len(chk["big_moves"]))
 
     cfg = bt.Cfg(start="2016-03-01", top_n=20, min_adtv_cr=0.5)
@@ -79,4 +81,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    test_synthetic_pipeline()

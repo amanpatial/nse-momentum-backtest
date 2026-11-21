@@ -8,9 +8,11 @@ Smallcap-250 zone plus a buffer, ~350 names).
 """
 import pandas as pd
 
+import paths
+
 
 def select(constituents_csv: str, start_rank: int = 251, end_rank: int = 600,
-           out: str = "universe.csv") -> pd.DataFrame:
+           out: str = str(paths.UNIVERSE_CSV)) -> pd.DataFrame:
     """Rank constituents by market cap and save those ranked start_rank..end_rank."""
     df = pd.read_csv(constituents_csv)
     missing = {"symbol", "mcap_cr"} - set(df.columns)

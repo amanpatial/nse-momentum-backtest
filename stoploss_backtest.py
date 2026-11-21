@@ -1,6 +1,6 @@
 """Momentum backtest with an optional fixed stop-loss, simulated with real share holdings.
 
-Usage: python stoploss_backtest.py --db smallcap.duckdb --cost-bps 12 --stops 0 0.20 0.25 --out results/stoploss
+Usage: python stoploss_backtest.py --cost-bps 12 --stops 0 0.20 0.25 --out results/stoploss
 
 Rules = backtest.py (3M rank, top 20, keep to rank 30, month-end review, liquidity filter) plus:
   * Stop: exit when the day's LOW touches entry_price * (1 - stop). Fill at the stop price, or at the
@@ -19,6 +19,7 @@ import duckdb
 import pandas as pd
 
 import backtest as bt
+import paths
 
 
 def load(db):
@@ -148,13 +149,13 @@ def stop_impact(td: pd.DataFrame, base: pd.DataFrame) -> dict:
 def main():
     """CLI: run the backtest for each stop level and print/save the comparison."""
     ap = argparse.ArgumentParser()
-    ap.add_argument("--db", default="smallcap.duckdb")
+    ap.add_argument("--db", default=str(paths.DB))
     ap.add_argument("--cost-bps", type=float, default=12.0)
     ap.add_argument("--stops", type=float, nargs="+", default=[0.0, 0.20, 0.25])
     ap.add_argument("--max-vol-pctile", type=float, default=1.0, help="volatility filter, 1.0 = off")
     ap.add_argument("--vol-window", type=int, default=63, help="trading days for volatility")
     ap.add_argument("--vol-freq", choices=["daily", "weekly"], default="daily", help="returns used for volatility")
-    ap.add_argument("--out", default="results/stoploss")
+    ap.add_argument("--out", default=str(paths.RESULTS_DIR / "stoploss"))
     a = ap.parse_args()
     out = pathlib.Path(a.out)
     out.mkdir(parents=True, exist_ok=True)

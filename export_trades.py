@@ -1,6 +1,6 @@
 """Export a trade log from the momentum backtest.
 
-Usage: python export_trades.py --db smallcap.duckdb --cost-bps 12 --out results/trades.csv
+Usage: python export_trades.py --cost-bps 12 --out results/trades.csv   (--db defaults to data/smallcap.duckdb)
 
 One row per holding period (buy -> sell) of a stock. Prices are adjusted closes.
 Timing matches backtest.run(): ranks use the rank-date close, and the position earns returns
@@ -15,17 +15,18 @@ import numpy as np
 import pandas as pd
 
 import backtest as bt
+import paths
 
 
 def main():
     """CLI: rerun the backtest and write one row per holding period to a CSV."""
     ap = argparse.ArgumentParser()
-    ap.add_argument("--db", default="smallcap.duckdb")
+    ap.add_argument("--db", default=str(paths.DB))
     ap.add_argument("--cost-bps", type=float, default=12.0)
     ap.add_argument("--max-vol-pctile", type=float, default=1.0, help="volatility filter, 1.0 = off")
     ap.add_argument("--vol-window", type=int, default=63, help="trading days for volatility")
     ap.add_argument("--vol-freq", choices=["daily", "weekly"], default="daily", help="returns used for volatility")
-    ap.add_argument("--out", default="results/trades.csv")
+    ap.add_argument("--out", default=str(paths.RESULTS_DIR / "trades.csv"))
     a = ap.parse_args()
 
     cfg = bt.Cfg(cost_bps=a.cost_bps, max_vol_pctile=a.max_vol_pctile,

@@ -1,6 +1,6 @@
 """Compare lookback / review-frequency variants of the momentum strategy (no stop-loss).
 
-Usage: python variants.py --db smallcap.duckdb --cost-bps 12 --out results/variants
+Usage: python variants.py --cost-bps 12 --out results/variants
 
 Lookback: 3M = 63, 6M = 126, 12M = 252 trading days. Review every N calendar days (first trading
 day on/after each date). All variants start on the same date (first day a 12M signal exists) so they
@@ -14,6 +14,7 @@ import pathlib
 import pandas as pd
 
 import backtest as bt
+import paths
 from stoploss_backtest import load, simulate
 
 LOOKBACK = {"3M": 63, "6M": 126, "12M": 252}
@@ -34,12 +35,12 @@ def every_n_days(dates, start, n):
 def main():
     """CLI: backtest each lookback / review-frequency variant on a common period and compare."""
     ap = argparse.ArgumentParser()
-    ap.add_argument("--db", default="smallcap.duckdb")
+    ap.add_argument("--db", default=str(paths.DB))
     ap.add_argument("--cost-bps", type=float, default=12.0)
     ap.add_argument("--max-vol-pctile", type=float, default=1.0, help="volatility filter, 1.0 = off")
     ap.add_argument("--vol-window", type=int, default=63, help="trading days for volatility")
     ap.add_argument("--vol-freq", choices=["daily", "weekly"], default="daily", help="returns used for volatility")
-    ap.add_argument("--out", default="results/variants")
+    ap.add_argument("--out", default=str(paths.RESULTS_DIR / "variants"))
     a = ap.parse_args()
     out = pathlib.Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
