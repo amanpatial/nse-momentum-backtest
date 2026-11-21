@@ -60,6 +60,7 @@ def main():
     p.add_argument("--corp-actions")
     p.add_argument("--detected-out", default=str(paths.DETECTED_ACTIONS))
     p.add_argument("--universe")
+    p.add_argument("--drop-rows", help="CSV symbol,start,end[,reason] of bad rows to remove before building")
 
     p = sub.add_parser("check")
     p.add_argument("--db", default=str(paths.DB))
@@ -83,7 +84,8 @@ def main():
     elif a.cmd == "build":
         print(ingest.build_db(a.raw, a.db, a.corp_actions, a.symbol_map, a.universe, a.parquet))
     elif a.cmd == "build-csv":
-        n, k = ingest.build_db_from_csv(a.csv, a.db, a.auto_adjust, a.corp_actions, a.detected_out, a.universe)
+        n, k = ingest.build_db_from_csv(a.csv, a.db, a.auto_adjust, a.corp_actions, a.detected_out, a.universe,
+                                        a.drop_rows)
         print(n, f"| {k} possible unadjusted splits flagged in {a.detected_out}")
     elif a.cmd == "check":
         for name, df in ingest.checks(a.db).items():

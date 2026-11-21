@@ -259,10 +259,23 @@ def detect_corp_actions(df: pd.DataFrame, tol: float = 0.04) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["symbol", "ex_date", "factor", "ratio", "vol_ratio"])
 
 
+def drop_rows(df: pd.DataFrame, drop_csv: str | None) -> pd.DataFrame:
+    """Remove known-bad rows listed in drop_csv (columns: symbol,start,end[,reason]; dates inclusive).
+    For data-source glitches that are not corporate actions: stale frozen quotes, mispriced sessions."""
+    if not drop_csv:
+        return df
+    bad = pd.read_csv(drop_csv, parse_dates=["start", "end"])
+    mask = pd.Series(False, index=df.index)
+    for r in bad.itertuples():
+        mask |= (df["symbol"] == r.symbol) & (df["date"] >= r.start) & (df["date"] <= r.end)
+    print(f"dropped {int(mask.sum())} bad rows listed in {drop_csv}")
+    return df[~mask].reset_index(drop=True)
+
+
 def build_db_from_csv(csv_path, db_path, auto_adjust=False, ca_csv=None,
-                      detected_out=str(paths.DETECTED_ACTIONS), universe_csv=None):
-    """Build the DuckDB ohlc table from the CSV dataset, flagging and applying splits."""
-    df = read_csv_dataset(csv_path)
+                      detected_out=str(paths.DETECTED_ACTIONS), universe_csv=None, drop_csv=None):
+    """Build the DuckDB ohlc table from the CSV dataset: drop listed bad rows, flag and apply splits."""
+    df = drop_rows(read_csv_dataset(csv_path), drop_csv)
     if universe_csv:
         df = df[df["symbol"].isin(set(pd.read_csv(universe_csv)["symbol"]))]
     det = detect_corp_actions(df)

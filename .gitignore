@@ -8,6 +8,8 @@ __pycache__/
 # except the hand-reviewed corporate-action fixes, which are part of the repo.
 data/*
 !data/corp_actions.csv
+!data/corp_actions_10y.csv
+!data/bad_rows_10y.csv
 !data/README.md
 *.duckdb
 *.duckdb.wal

@@ -112,7 +112,11 @@ def main():
     out.to_csv(a.out, index=False)
     first = out.groupby("Ticker")["Date"].min() if len(out) else pd.Series(dtype=str)
     print(f"wrote {a.out}: {len(out)} rows, {out['Ticker'].nunique() if len(out) else 0} tickers")
-    print(f"tickers with history starting after {a.start[:4]}-03: {(first > a.start[:4] + '-03').sum()}")
+    if len(first):                                   # compare with the first trading day actually downloaded
+        cutoff = pd.Timestamp(first.min()) + pd.Timedelta(days=10)   # grace for holidays / thin early trading
+        late = int((pd.to_datetime(first) > cutoff).sum())
+        print(f"full history from {first.min()}: {len(first) - late} tickers | "
+              f"listed later (shorter history): {late}")
     if failed:
         print(f"no data for {len(failed)} symbols (renamed/delisted/ticker mismatch): {failed[:30]}")
 

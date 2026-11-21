@@ -55,6 +55,28 @@ def test_csv_loader_flags_only_the_split_and_adjusts_it():
         shutil.rmtree(tmp)
 
 
+def test_drop_rows_removes_listed_ranges_only():
+    """--drop-rows removes exactly the listed symbol/date ranges (inclusive) and nothing else."""
+    tmp = pathlib.Path(tempfile.mkdtemp())
+    try:
+        days = pd.bdate_range("2021-06-09", "2023-06-09")
+        write_synthetic_csv(tmp / "x.csv", days)
+        pd.DataFrame({"symbol": ["AAA", "BBB"], "start": [str(days[0].date()), str(days[10].date())],
+                      "end": [str(days[4].date()), str(days[10].date())],
+                      "reason": ["stale quotes", "mispriced session"]}).to_csv(tmp / "bad.csv", index=False)
+        ingest.build_db_from_csv(str(tmp / "x.csv"), str(tmp / "t.duckdb"), detected_out=str(tmp / "det.csv"),
+                                 drop_csv=str(tmp / "bad.csv"))
+        con = duckdb.connect(str(tmp / "t.duckdb"), read_only=True)
+        n = dict(con.execute("select symbol, count(*) from ohlc group by 1").fetchall())
+        gone = con.execute(f"select count(*) from ohlc where symbol='BBB' and date = date '{days[10].date()}'").fetchone()[0]
+        con.close()
+        assert n == {"AAA": len(days) - 5, "BBB": len(days) - 1, "CCC": len(days)}, n
+        assert gone == 0
+    finally:
+        shutil.rmtree(tmp)
+
+
 if __name__ == "__main__":
     test_csv_loader_flags_only_the_split_and_adjusts_it()
+    test_drop_rows_removes_listed_ranges_only()
     print("CSV LOADER OK")
