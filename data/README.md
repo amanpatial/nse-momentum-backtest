@@ -29,11 +29,9 @@ writes every result to `results/`.
 
 Optional 10-year database (separate from the default one):
 ```bash
-python pipeline.py build-csv --csv data/nifty500_2016_2026.csv --db data/nifty500_10y.duckdb \
-    --detected-out data/detected_actions_10y.csv --corp-actions data/corp_actions_10y.csv \
-    --drop-rows data/bad_rows_10y.csv
-python pipeline.py backtest --db data/nifty500_10y.duckdb --out results/10y/base_12bps --cost-bps 12
+DATASET=10y ./run_all.sh     # builds data/nifty500_10y.duckdb with the reviewed fixes, all results -> results/10y/
 ```
+Then pick **10 years** in the dashboard's sidebar *Dataset* selector.
 It uses today's Nifty 500 list, so survivorship bias is larger than in the default 4.6-year data.
 
 Default locations are set in `paths.py`; change them there if you keep the data elsewhere.

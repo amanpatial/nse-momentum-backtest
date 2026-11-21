@@ -104,6 +104,8 @@ Troubleshooting:
   rerun `backtest.run()` on `data/smallcap.duckdb` (a few seconds), compared with the default rules.
 
 The dashboard only reads `results/` and the database; it never changes them. Follows your light/dark theme.
+A **Dataset** selector in the sidebar switches every page between the main data and the optional 10-year
+data (after `DATASET=10y ./run_all.sh`; see section 6.6).
 
 **Screenshots:**
 
@@ -211,9 +213,7 @@ Input files: `nifty500_2016.csv` (`symbol,mcap_cr`), `data/corp_actions.csv`, `s
 ```bash
 pip install yfinance
 python nifty500_downloader.py --start 2016-11-22 --end 2026-11-22     # ~40 s -> data/nifty500_2016_2026.csv
-python pipeline.py build-csv --csv data/nifty500_2016_2026.csv --db data/nifty500_10y.duckdb \
-    --detected-out data/detected_actions_10y.csv --corp-actions data/corp_actions_10y.csv \
-    --drop-rows data/bad_rows_10y.csv
+DATASET=10y ./run_all.sh          # builds data/nifty500_10y.duckdb with the reviewed fixes -> results/10y/
 ```
 Yahoo prices include dividends but still had unadjusted splits and glitches; `data/corp_actions_10y.csv`
 and `data/bad_rows_10y.csv` hold the reviewed fixes (see section 6.6). Yahoo revises prices over time, so a
@@ -462,9 +462,9 @@ test needs historical index membership.
 - After cleaning, every remaining one-day move beyond +-35% is a real event (2017 PSU-bank
   recapitalisation, 2020 crash, YESBANK rescue, ZEEL-Invesco).
 
-Reproduce: build the database (Option C), then
-`python pipeline.py backtest --db data/nifty500_10y.duckdb --out results/10y/base_12bps --cost-bps 12`
-(add `--max-vol-pctile 0.9` for the filter, `--cost-bps 40` for the default cost).
+Reproduce everything (database, all experiments, trade logs) after downloading the data (Option C):
+`DATASET=10y ./run_all.sh` writes the full result set to `results/10y/`. In the dashboard, pick
+**10 years** in the sidebar's *Dataset* selector to explore it (every page, including *Run a backtest*).
 
 ### 6.7 Ideas not yet tested
 - Capital gains tax (STCG 20% on realized strategy gains each year, LTCG 12.5% on buy and hold at exit).

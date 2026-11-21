@@ -17,8 +17,15 @@ import streamlit as st
 import backtest as bt
 import paths
 
-RES = paths.RESULTS_DIR
-DB = paths.DB
+# Datasets the dashboard can show; the sidebar picks one and sets RES / DB / DATASET below.
+DATASETS = {
+    "Main · 2021–2026 (IITKGP)": dict(res=paths.RESULTS_DIR, db=paths.DB, cmd="./run_all.sh", note=None),
+    "10 years · 2017–2026 (Yahoo)": dict(
+        res=paths.RESULTS_10Y_DIR, db=paths.DB_10Y, cmd="DATASET=10y ./run_all.sh",
+        note="Uses today's Nifty 500 list over 10 years, so survivorship bias is larger: on the stocks both "
+             "datasets share, returns are about 8 points a year lower (README, section 6.6)."),
+}
+RES, DB, DATASET = paths.RESULTS_DIR, paths.DB, DATASETS["Main · 2021–2026 (IITKGP)"]   # set by the sidebar
 
 st.set_page_config(page_title="NSE Momentum Backtest", page_icon="📈", layout="wide")
 
@@ -85,19 +92,19 @@ def data_view(df: pd.DataFrame, label: str = "Show data"):
 # ---------------------------------------------------------------- loading
 
 @st.cache_data
-def read_csv(rel: str, mtime: float, **kw) -> pd.DataFrame:
-    """Read a results CSV (mtime is only a cache key so reruns of run_all.sh are picked up)."""
-    return pd.read_csv(RES / rel, **kw)
+def read_csv(path: str, mtime: float, **kw) -> pd.DataFrame:
+    """Read a results CSV (full path + mtime are the cache key, so datasets and reruns never mix)."""
+    return pd.read_csv(path, **kw)
 
 
 def load(rel: str, **kw) -> pd.DataFrame | None:
-    """Load results/<rel> if it exists, else None."""
+    """Load <selected results dir>/<rel> if it exists, else None."""
     p = RES / rel
-    return read_csv(rel, p.stat().st_mtime, **kw) if p.exists() else None
+    return read_csv(str(p), p.stat().st_mtime, **kw) if p.exists() else None
 
 
 def load_json(rel: str) -> dict | None:
-    """Load results/<rel> JSON if it exists, else None."""
+    """Load <selected results dir>/<rel> JSON if it exists, else None."""
     p = RES / rel
     return json.loads(p.read_text()) if p.exists() else None
 
@@ -105,7 +112,7 @@ def load_json(rel: str) -> dict | None:
 def need(*objs) -> bool:
     """Show a hint and return False if any required results file is missing."""
     if any(o is None for o in objs):
-        st.warning("Some results are missing. Run `./run_all.sh` in the repo root first, then reload.")
+        st.warning(f"Some results are missing for this dataset. Run `{DATASET['cmd']}` in the repo root, then reload.")
         return False
     return True
 
@@ -196,8 +203,9 @@ STRATS = {
 def page_overview():
     """Headline numbers, growth of Rs 1 cr, drawdowns and monthly returns for one strategy."""
     st.title("NSE momentum backtest")
-    st.caption("Nifty 500 universe · rank by 3-month return, hold top 20, sell below rank 30 · "
-               "before tax · survivorship-biased, short and mostly bullish period (see README, Limitations)")
+    st.caption("Nifty 500 universe · rank by 3-month return, hold top 20, sell below rank 30 · before tax · "
+               + ("survivorship-biased, short and mostly bullish period (see README, Limitations)"
+                  if DATASET["note"] is None else "10-year Yahoo data, larger survivorship bias (see sidebar)"))
     choice = st.radio("Strategy", list(STRATS), horizontal=True, label_visibility="collapsed")
     summ, r = load_json(STRATS[choice][0]), daily(STRATS[choice][1])
     if not need(summ, r):
@@ -424,17 +432,17 @@ def page_experiments():
             fn()
 
 
-@st.cache_resource(show_spinner="Loading prices from smallcap.duckdb ...")
-def panel():
-    """Price and traded-value tables from DuckDB, loaded once per session."""
-    return bt.load_panel(str(DB))
+@st.cache_resource(show_spinner="Loading prices from the database ...")
+def panel(db: str):
+    """Price and traded-value tables from a DuckDB file, loaded once per session per database."""
+    return bt.load_panel(db)
 
 
 @st.cache_data(show_spinner="Running backtest ...")
-def run_cached(cfg_items: tuple):
-    """Run backtest.run for a Cfg (passed as a hashable tuple) and return daily returns + report."""
+def run_cached(db: str, cfg_items: tuple):
+    """Run backtest.run on db for a Cfg (passed as a hashable tuple) and return daily returns + report."""
     cfg = bt.Cfg(**dict(cfg_items))
-    px, to = panel()
+    px, to = panel(db)
     out, _ = bt.run(px, to, cfg)
     return out, bt.report(out, cfg)
 
@@ -443,9 +451,9 @@ def page_run():
     """Rerun the backtest with custom rules and compare it with the default rules at the same cost."""
     st.title("Run a backtest")
     if not DB.exists():
-        st.warning("data/smallcap.duckdb not found. Run `./run_all.sh` first.")
+        st.warning(f"{DB.relative_to(paths.ROOT)} not found. Run `{DATASET['cmd']}` first.")
         return
-    st.caption("Changes the rules and reruns the full backtest on data/smallcap.duckdb (a few seconds). "
+    st.caption(f"Changes the rules and reruns the full backtest on {DB.relative_to(paths.ROOT)} (a few seconds). "
                "Compared with the default rules at the same cost.")
     d = bt.Cfg()
     with st.form("cfg"):
@@ -471,8 +479,8 @@ def page_run():
 
     cfg = dict(lookback=lookback, top_n=top_n, buffer=buffer, cost_bps=float(cost), min_adtv_cr=float(adtv),
                start=str(start), max_vol_pctile=1 - drop / 100, vol_window=vwin, vol_freq=vfreq)
-    out, rep = run_cached(tuple(sorted(cfg.items())))
-    base_out, base_rep = run_cached(tuple(sorted({"cost_bps": float(cost), "start": str(start)}.items())))
+    out, rep = run_cached(str(DB), tuple(sorted(cfg.items())))
+    base_out, base_rep = run_cached(str(DB), tuple(sorted({"cost_bps": float(cost), "start": str(start)}.items())))
 
     st.subheader("Your settings")
     stat_tiles(rep["strategy_net"], base_rep["strategy_net"], rep["rs_1cr_becomes_cr"]["strategy_net"],
@@ -502,4 +510,10 @@ nav = st.navigation([
     st.Page(page_experiments, title="Experiments", icon="🧪"),
     st.Page(page_run, title="Run a backtest", icon="⚙️"),
 ])
+choice = st.sidebar.radio("Dataset", list(DATASETS), key="dataset",
+                          help="Main = the README's headline results. 10 years = README section 6.6.")
+DATASET = DATASETS[choice]
+RES, DB = DATASET["res"], DATASET["db"]
+if DATASET["note"]:
+    st.sidebar.warning(DATASET["note"], icon="⚠️")
 nav.run()

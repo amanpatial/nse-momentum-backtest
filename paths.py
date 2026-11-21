@@ -15,3 +15,7 @@ RAW_DIR = DATA_DIR / "raw"                             # NSE bhavcopy downloads 
 UNIVERSE_CSV = DATA_DIR / "universe.csv"               # selected universe (Option B)
 
 RESULTS_DIR = ROOT / "results"                         # everything run_all.sh writes
+
+# Optional 10-year Yahoo dataset (DATASET=10y ./run_all.sh; README section 6.6)
+DB_10Y = DATA_DIR / "nifty500_10y.duckdb"
+RESULTS_10Y_DIR = RESULTS_DIR / "10y"
