@@ -102,7 +102,7 @@ backtest.py, ingest.py, paths.py      core modules (strategy engine, data loadin
 pipeline.py, export_trades.py, ...    command-line scripts (table below)
 dashboard.py                          Streamlit dashboard
 run_all.sh                            reproduces every result
-data/                                 inputs + database (only corp_actions.csv is in git)
+data/                                 inputs + database (only corp_actions.csv is in git; see data/README.md)
 tests/                                pytest tests (no data needed)
 results/                              outputs of run_all.sh (not in git)
 ```
